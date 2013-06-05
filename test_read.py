@@ -1,6 +1,6 @@
 from asyncore import file_dispatcher, loop
 from evdev import InputDevice, categorize, ecodes
-dev = InputDevice('/dev/input/event1')
+dev = InputDevice('/dev/input/mouse0')
 
 class InputDeviceDispatcher(file_dispatcher):
   def __init__(self, device):
