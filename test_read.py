@@ -44,20 +44,21 @@ class InputDeviceDispatcher(object):
         elif event.event.value > 0:
           self.tx = min(400, self.tx + event.event.value)
           
-        print 'X: %d\t\t\t\tPos: (%d, %d)' % (event.event.value, self.tx, self.ty)
+        #print 'X: %d\t\t\t\tPos: (%d, %d)' % (event.event.value, self.tx, self.ty)
       elif event.event.code == ecodes.REL_Y:
         if event.event.value > 0:
           self.ty = max(0, self.ty - event.event.value)
         elif event.event.value < 0:
           self.ty = min(320, self.ty - event.event.value)
 
-        print '\t\tY: %d\t\tPos: (%d, %d)' % (event.event.value, self.tx, self.ty)
+        #print '\t\tY: %d\t\tPos: (%d, %d)' % (event.event.value, self.tx, self.ty)
       else:
         print 'other relative event'
 
       hue = int(65000.0 * (float(self.tx) / 400.0))
       bri = int(255.0 * (float(self.ty) / 320.0))
-      command = {'bri': bri, 'hue': hue}
+      command = {'bri': bri, 'hue': hue, 'sat': 255}
+      print command
       self.sender.set(command)
 
 class Sender(threading.Thread):
@@ -65,7 +66,7 @@ class Sender(threading.Thread):
     threading.Thread.__init__(self)
     self.daemon = True
     self.bridge = bridge
-    self.next = {'hue':32500,'bri': 128}
+    self.next = {'hue':32500,'bri': 128, 'sat': 255}
     self.dirty = True
 
   def run(self):
