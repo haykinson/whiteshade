@@ -4,6 +4,8 @@ import requests
 import threading
 import time
 from select import select
+import random
+import traceback
 
 devices = [InputDevice(x) for x in list_devices()]
 dev = [d for d in devices if d.name == 'Mouse Pad']
@@ -58,7 +60,10 @@ class InputDeviceDispatcher(object):
       hue = int(65000.0 * (float(self.tx) / 400.0))
       bri = int(255.0 * (float(self.ty) / 320.0))
       command = {'bri': bri, 'hue': hue, 'sat': 255}
-      print command
+      #echo only every so often...
+      if random.randint() < 5:
+        print command
+
       self.sender.set(command)
 
 class Sender(threading.Thread):
@@ -73,8 +78,11 @@ class Sender(threading.Thread):
     while (True):
       if self.dirty:
         self.dirty = False
-        self.bridge.set_light([1,2,3], self.next)
-        #self.bridge.set_group(1, self.next)
+        try:
+          self.bridge.set_light([1,2,3], self.next)
+          #self.bridge.set_group(1, self.next)
+        except Exception, ex:
+          print traceback.format_exc()
       time.sleep(0.1)
   
   def set(self, next):
