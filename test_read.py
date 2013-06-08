@@ -61,7 +61,7 @@ class InputDeviceDispatcher(object):
       bri = int(255.0 * (float(self.ty) / 320.0))
       command = {'bri': bri, 'hue': hue, 'sat': 255}
       #echo only every so often...
-      if random.randint() < 5:
+      if random.randint(1,100) < 5:
         print command
 
       self.sender.set(command)
