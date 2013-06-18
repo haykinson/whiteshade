@@ -39,6 +39,7 @@ class MousePadHandler(object):
     command = {'bri': bri, 'hue': hue, 'sat': 255}
 
     base.update(command)
+    return base
 
   def move_left(self, amount):
     self.tx = max(0, self.tx + amount)
@@ -89,15 +90,15 @@ class InputDeviceDispatcher(object):
 
       if event.event.code == ecodes.REL_X: #left/right movement
         if event.event.value < 0:
-          self.handler.left(event.event.value)
+          self.handler.move_left(event.event.value)
         elif event.event.value > 0:
-          self.handler.right(event.event.value)
+          self.handler.move_right(event.event.value)
 
       elif event.event.code == ecodes.REL_Y: #up/down movement
         if event.event.value > 0:
-          self.handler.down(event.event.value)
+          self.handler.move_down(event.event.value)
         elif event.event.value < 0:
-          self.handler.up(event.event.value)
+          self.handler.move_up(event.event.value)
 
       else:
         print 'other relative event'
