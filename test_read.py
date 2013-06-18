@@ -7,21 +7,67 @@ from select import select
 import random
 import traceback
 
-devices = [InputDevice(x) for x in list_devices()]
-dev = [d for d in devices if d.name == 'Mouse Pad']
+class MousePadHandler(object):
+  """Handles mouse pad events to change brightness and hue"""
+  #TODO consider splitting bridge-specific commands from logical commands
+
+  max_x = 400
+  max_y = 320
+
+  slow_transition = 20 #tenths of a second
+
+  def __init__(self, sender):
+    self.sender = sender
+    self.reset()
+
+  def reset(self):
+    self.tx = self.max_x / 2
+    self.ty = self.max_y / 2
+
+  def on(self):
+    command = self.append_xy({'on': True, 'transitiontime': self.slow_transition})
+    self.sender.set(command)
+
+  def off(self):
+    #turning off doesn't necessitate changing hue or brightness, so use a raw command
+    command = {'on': False, 'transitiontime': self.slow_transition}
+    self.sender.set(command)
+
+  def append_xy(self, base={}):
+    hue = int(65000.0 * (float(self.tx) / float(self.max_x)))
+    bri = int(255.0 * (float(self.ty) / float(self.max_y)))
+    command = {'bri': bri, 'hue': hue, 'sat': 255}
+
+    base.update(command)
+
+  def move_left(self, amount):
+    self.tx = max(0, self.tx + amount)
+
+  def move_right(self, amount):
+    self.tx = min(self.max_x, self.tx + amount)
+
+  def move_up(self, amount):
+    self.ty = min(self.max_y, self.ty - amount)
+
+  def move_down(self, amount):
+    self.ty = max(0, self.ty - amount)
+
+  def update(self):
+    command = self.append_xy()
+
+    #echo only every so often...
+    if random.randint(1,100) < 5:
+      print command
+
+    self.sender.set(command)
+
 
 class InputDeviceDispatcher(object):
-  def __init__(self, device, sender):
-    self.device = device
-    self.sender = sender
-    self.tx = 200
-    self.ty = 160
+  """Defines a listener for mouse movement events, encoding them into bridge commands"""
 
-  #def read_loop(self):
-  #  while True:
-  #    r,w,x = select([self.device.fd], [], []) #, 1) #1 sec timeout
-  #    for event in self.device.read():
-  #      yield event
+  def __init__(self, device, handler):
+    self.device = device
+    self.handler = handler
 
   def start(self):
     for event in self.device.read_loop():
@@ -30,79 +76,96 @@ class InputDeviceDispatcher(object):
   def handle_event(self, event):
     event = categorize(event)
     if isinstance(event, events.KeyEvent):
-      if event.event.code == ecodes.BTN_MOUSE:
-        #turn on, and to normal brightness
-        self.tx = 200
-        self.ty = 160
-        self.sender.set({'on':True,'bri':128,'hue':32500,'transitiontime':20})
-      elif event.event.code == ecodes.BTN_RIGHT:
-        self.tx = 200
-        self.ty = 160
-        self.sender.set({'on':False, 'transitiontime': 20})
-    elif isinstance(event, events.RelEvent):
-      if event.event.code == ecodes.REL_X:
-        if event.event.value < 0:
-          self.tx = max(0, self.tx + event.event.value)
-        elif event.event.value > 0:
-          self.tx = min(400, self.tx + event.event.value)
-          
-        #print 'X: %d\t\t\t\tPos: (%d, %d)' % (event.event.value, self.tx, self.ty)
-      elif event.event.code == ecodes.REL_Y:
-        if event.event.value > 0:
-          self.ty = max(0, self.ty - event.event.value)
-        elif event.event.value < 0:
-          self.ty = min(320, self.ty - event.event.value)
 
-        #print '\t\tY: %d\t\tPos: (%d, %d)' % (event.event.value, self.tx, self.ty)
+      if event.event.code == ecodes.BTN_MOUSE:
+        self.handler.reset() #TODO consider not doing this unless double-clicking?
+        self.handler.on()
+
+      elif event.event.code == ecodes.BTN_RIGHT:
+        self.handler.reset() #TODO consider not doing this at all?
+        self.handler.off()
+
+    elif isinstance(event, events.RelEvent):
+
+      if event.event.code == ecodes.REL_X: #left/right movement
+        if event.event.value < 0:
+          self.handler.left(event.event.value)
+        elif event.event.value > 0:
+          self.handler.right(event.event.value)
+
+      elif event.event.code == ecodes.REL_Y: #up/down movement
+        if event.event.value > 0:
+          self.handler.down(event.event.value)
+        elif event.event.value < 0:
+          self.handler.up(event.event.value)
+
       else:
         print 'other relative event'
 
-      hue = int(65000.0 * (float(self.tx) / 400.0))
-      bri = int(255.0 * (float(self.ty) / 320.0))
-      command = {'bri': bri, 'hue': hue, 'sat': 255}
-      #echo only every so often...
-      if random.randint(1,100) < 5:
-        print command
-
-      self.sender.set(command)
+      self.handler.update()
 
 class Sender(threading.Thread):
+  """Runs a thread that transmits commands to the bridge"""
+
   def __init__(self, bridge):
     threading.Thread.__init__(self)
     self.daemon = True
     self.bridge = bridge
-    self.next = {'hue':32500,'bri': 128, 'sat': 255}
+    self.next = {'hue':32500,'bri': 128, 'sat': 255} #defaults; TODO make configurable?
     self.dirty = True
 
   def run(self):
+    """
+    Runs a never-ending loop looking for the dirty flag, 
+    sleeping 1/10th of a second between each attempt to send a message
+    """
     while (True):
       if self.dirty:
         self.dirty = False
         try:
+          #TODO configure somehow?
           self.bridge.set_light([1,2,3], self.next)
           #self.bridge.set_group(1, self.next)
         except Exception, ex:
-          print traceback.format_exc()
-      time.sleep(0.1)
+          print traceback.format_exc() #TODO eat, or notify?
+      time.sleep(0.1) #TODO make configurable?
   
   def set(self, next):
+    """Sets the command that should be transmitted on the next loop iteration"""
     self.next = next
     self.dirty = True
 
-print dev
 
-if dev and len(dev) > 0:
-  r = requests.get('http://www.meethue.com/api/nupnp')
-  d = r.json()
-  ip = d[0]['internalipaddress']
+if __name__ == '__main__':
 
-  b = Bridge(ip)  
+  devices = [InputDevice(x) for x in list_devices()]
 
-  dev = dev[0]
+  #TODO consider a gentler setup for this to pick a device?
+  dev = [d for d in devices if d.name == 'Mouse Pad']
 
-  sender = Sender(b)
-  sender.start()
+  print 'Detected mouse pad devices: %s' % str(dev)
 
-  d = InputDeviceDispatcher(dev, sender)
-  d.start()
+  if dev and len(dev) > 0:
+    #get IP of bridge; TODO consider other ways?
+    r = requests.get('http://www.meethue.com/api/nupnp')
+    d = r.json()
+    ip = d[0]['internalipaddress']
 
+    #connect to bridge
+    b = Bridge(ip)  
+
+    #this is our device
+    dev = dev[0]
+
+    #start the sender
+    sender = Sender(b)
+    sender.start()
+
+    #create the command handler
+    handler = MousePadHandler(sender)
+
+    #start the device loop
+    d = InputDeviceDispatcher(dev, handler)
+    d.start()
+else:
+  print 'No devices detected, exiting' #TODO notify and not exit instead?
