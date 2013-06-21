@@ -6,6 +6,8 @@ import time
 from select import select
 import random
 import traceback
+import web
+import json
 
 class MousePadHandler(object):
   """Handles mouse pad events to change brightness and hue"""
@@ -136,6 +138,24 @@ class Sender(threading.Thread):
     self.next = next
     self.dirty = True
 
+class Web(threading.Thread):
+
+  def __init__(self, handler):
+    threading.Thread.__init__(self)
+    self.daemon = True
+    Web.handler = handler
+
+  def run(self):
+    urls = ('/', 'index')
+    web.application(urls, self.__class__.__dict__).run()
+
+  class index:
+    def GET(self):
+      return json.dumps(dict(x=Web.handler.tx,y=Web.handler.ty))
+    
+  class restart:
+    def GET(self):
+      return 'not yet'
 
 if __name__ == '__main__':
 
@@ -164,6 +184,10 @@ if __name__ == '__main__':
 
     #create the command handler
     handler = MousePadHandler(sender)
+
+    #start the web handler
+    w = Web(handler)
+    w.start()
 
     #start the device loop
     d = InputDeviceDispatcher(dev, handler)
