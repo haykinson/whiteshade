@@ -1,0 +1,54 @@
+<!doctype html>
+ 
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <link rel="stylesheet" href="http://code.jquery.com/ui/1.10.3/themes/smoothness/jquery-ui.css" />
+  <script src="http://code.jquery.com/jquery-1.9.1.js"></script>
+  <script src="http://code.jquery.com/ui/1.10.3/jquery-ui.js"></script>
+  <link rel="stylesheet" href="/resources/demos/style.css" />
+  <script>
+  $(function() {
+    $( "#slider-vertical" ).slider({
+      orientation: "vertical",
+      range: "min",
+      min: 0,
+      max: 320,
+      value: 160,
+      slide: function( event, ui ) {
+        $( "#amount" ).val( ui.value );
+      }
+    });
+    $( "#amount" ).val( $( "#slider-vertical" ).slider( "value" ) );
+    
+    $( "#slider-horizontal" ).slider({
+      orientation: "horizontal",
+      range: "min",
+      min: 0,
+      max: 400,
+      value: 200,
+      slide: function( event, ui ) {
+        $( "#color" ).val( ui.value );
+      }
+    });
+    $( "#color" ).val( $( "#slider-horizontal" ).slider( "value" ) );
+  });
+  </script>
+</head>
+<body>
+ 
+<p>
+  <label for="amount">Brightness:</label>
+  <input type="text" id="amount" style="border: 0; color: #f6931f; font-weight: bold;" />
+</p>
+
+<p>
+  <label for="color">Color:</label>
+  <input type="text" id="color" style="border: 0; color: #f6931f; font-weight: bold;" />
+</p>
+ 
+<div id="slider-vertical" style="height: 160px;"></div>
+<div id="slider-horizontal" style="width: 200px;"></div>
+ 
+</body>
+</html>
