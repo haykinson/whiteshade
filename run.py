@@ -8,6 +8,7 @@ import random
 import traceback
 import web
 import json
+import sys
 
 class MousePadHandler(object):
   """Handles mouse pad events to change brightness and hue"""
@@ -138,6 +139,11 @@ class Sender(threading.Thread):
     self.next = next
     self.dirty = True
 
+class WebApp(web.application):
+  def run(self, port=8080, *middleware):
+    func = self.wsgifunc(*middleware)
+    return web.httpserver.runsimple(func, ('0.0.0.0', port))
+
 class Web(threading.Thread):
 
   def __init__(self, handler):
@@ -147,7 +153,7 @@ class Web(threading.Thread):
 
   def run(self):
     urls = ('/', 'index')
-    web.application(urls, self.__class__.__dict__).run()
+    WebApp(urls, self.__class__.__dict__).run()
 
   class index:
     def GET(self):
@@ -168,9 +174,12 @@ if __name__ == '__main__':
 
   if dev and len(dev) > 0:
     #get IP of bridge; TODO consider other ways?
-    r = requests.get('http://www.meethue.com/api/nupnp')
-    d = r.json()
-    ip = d[0]['internalipaddress']
+    if len(sys.argv) > 1:
+      ip = sys.argv[1]
+    else:
+      r = requests.get('http://www.meethue.com/api/nupnp')
+      d = r.json()
+      ip = d[0]['internalipaddress']
 
     #connect to bridge
     b = Bridge(ip)  
